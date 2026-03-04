@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vượt Mê Cung</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=Montserrat:wght@400;600&display=swap');
+
+        :root {
+            --bg-dark: #070b14;
+            --primary-glow: #10b981; 
+            --accent: #fbbf24; 
+            --text-main: #f3f4f6;
+            --danger: #ef4444;
+        }
+
+        body {
+            margin: 0; padding: 0;
+            background: radial-gradient(circle at center, #1a2639 0%, var(--bg-dark) 100%);
+            font-family: 'Montserrat', sans-serif;
+            color: var(--text-main);
+            display: flex; justify-content: center; align-items: center;
+            min-height: 100vh; overflow: hidden;
+        }
+
+        body::before {
+            content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            background-image: repeating-linear-gradient(45deg, rgba(255,255,255,0.015) 0px, rgba(255,255,255,0.015) 2px, transparent 2px, transparent 12px);
+            z-index: -1;
+        }
+
+        .container {
+            background: rgba(16, 24, 39, 0.85);
+            padding: 40px; border-radius: 16px;
+            box-shadow: 0 0 30px rgba(16, 185, 129, 0.15), inset 0 0 20px rgba(0, 0, 0, 0.8);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            width: 90%; max-width: 450px;
+            backdrop-filter: blur(10px);
+            text-align: center;
+        }
+
+        .screen { display: none; }
+        .screen.active { display: block; animation: fadeIn 0.5s ease-in-out; }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        h1 {
+            font-family: 'Cinzel', serif; color: var(--accent);
+            font-size: 32px; margin-bottom: 5px; letter-spacing: 3px;
+            text-shadow: 0 0 15px rgba(251, 191, 36, 0.5);
+        }
+
+        p.subtitle { color: #9ca3af; font-size: 14px; margin-bottom: 25px; }
+        .instruction { color: #d1d5db; font-size: 15px; margin-bottom: 20px; font-style: italic; }
+
+        input[type="text"] {
+            width: 100%; padding: 15px; margin-bottom: 20px;
+            background: rgba(0, 0, 0, 0.6); border: 2px solid #374151;
+            border-radius: 8px; color: white; font-size: 16px; font-weight: bold; letter-spacing: 2px;
+            box-sizing: border-box; text-align: center; transition: 0.3s;
+        }
+        input[type="text"]:focus { outline: none; border-color: var(--primary-glow); box-shadow: 0 0 15px rgba(16, 185, 129, 0.3); }
+
+        .btn {
+            width: 100%; padding: 15px; background: linear-gradient(45deg, #047857, #10b981);
+            border: none; border-radius: 8px; color: white; font-size: 16px; font-weight: bold;
+            text-transform: uppercase; letter-spacing: 2px; cursor: pointer; transition: 0.3s;
+            margin-bottom: 10px;
+        }
+        .btn:hover { background: linear-gradient(45deg, #059669, #34d399); transform: translateY(-2px); box-shadow: 0 5px 15px rgba(16, 185, 129, 0.4); }
+        .btn:disabled { background: #4b5563; cursor: not-allowed; transform: none; box-shadow: none; }
+        
+        .btn-secondary {
+            background: transparent; border: 1px solid var(--primary-glow); color: var(--primary-glow);
+        }
+        .btn-secondary:hover { background: rgba(16, 185, 129, 0.1); }
+
+        .hud { display: flex; justify-content: space-between; margin-bottom: 20px; font-size: 14px; font-weight: 600; color: var(--accent); }
+        .station-title { font-size: 24px; color: var(--primary-glow); margin-bottom: 25px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; }
+        
+        .leaderboard-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        .leaderboard-table th, .leaderboard-table td { padding: 10px; border-bottom: 1px solid #374151; text-align: left; }
+        .leaderboard-table th { color: var(--primary-glow); font-size: 12px; text-transform: uppercase; }
+        .rank-1 { color: #fbbf24; font-weight: bold; text-shadow: 0 0 5px rgba(251, 191, 36, 0.5); }
+        .rank-2 { color: #d1d5db; font-weight: bold; }
+        .rank-3 { color: #b45309; font-weight: bold; }
+
+        #loadingLeaderboard { color: var(--primary-glow); font-size: 14px; margin-top: 15px; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div id="screen-start" class="screen active">
+            <h1>VƯỢT MÊ CUNG</h1>
+            <p class="subtitle">Nhập tên đội của bạn để bắt đầu hành trình</p>
+            <input type="text" id="playerName" placeholder="Tên Đội / Mã số..." autocomplete="off">
+            <button class="btn" id="btnStart">Tiến Vào Mê Cung (Enter)</button>
+            <button class="btn btn-secondary" id="btnViewLeaderboard">Xem Bảng Vàng Top 10</button>
+        </div>
+
+        <div id="screen-game" class="screen">
+            <div class="hud">
+                <span id="scoreDisplay">Năng lượng: 0</span>
+                <span id="timeDisplay">Thời gian: 0s</span>
+            </div>
+            <div class="station-title" id="stationName">Trạm 1</div>
+            <div class="instruction">Tiến hành giải mã và nhập đáp án để mở cổng</div>
+            <input type="text" id="playerAnswer" placeholder="Nhập mã khóa..." autocomplete="off">
+            <button class="btn" id="btnSubmitAnswer">Kích Hoạt (Enter)</button>
+            <p id="feedback" style="margin-top: 15px; font-size: 14px; height: 20px; font-weight: 600;"></p>
+        </div>
+
+        <div id="screen-leaderboard" class="screen">
+            <h1>BẢNG VÀNG</h1>
+            <p class="subtitle">Top 10 Đội Khám Phá Xuất Sắc Nhất</p>
+            <p id="finalResult" style="color: var(--primary-glow); font-weight: bold; margin-bottom: 20px;"></p>
+            <div id="loadingLeaderboard">Đang đồng bộ dữ liệu với hệ thống trung tâm...</div>
+            <table class="leaderboard-table" id="leaderboardTable" style="display: none;">
+                <thead>
+                    <tr>
+                        <th>Hạng</th>
+                        <th>Đội / Cá nhân</th>
+                        <th>Điểm</th>
+                        <th>Thời gian</th>
+                    </tr>
+                </thead>
+                <tbody id="leaderboardBody">
+                    </tbody>
+            </table>
+            <button class="btn" onclick="location.reload()" style="margin-top: 25px;">Quay Lại Trang Chủ</button>
+        </div>
+    </div>
+
+    <script>
+        // CẤU HÌNH ÂM THANH MP3 (Hỗ trợ tốt trên iOS/Safari)
+        const sfxCorrect = new Audio('https://www.myinstants.com/media/sounds/correct.mp3');
+        const sfxWrong = new Audio('https://www.myinstants.com/media/sounds/wrong-buzzer.mp3');
+        const sfxWin = new Audio('https://www.myinstants.com/media/sounds/level-up.mp3');
+
+        // MÃ KHÓA 4 TRẠM
+        const stations = [
+            { name: "Trạm 1: Khởi Nguyên", answer: "3954" },
+            { name: "Trạm 2: Ảo Ảnh", answer: "2038" },
+            { name: "Trạm 3: Lối Rẽ", answer: "25" },
+            { name: "Trạm 4: Cốt Lõi", answer: "1559" }
+        ];
+        
+        // KẾT NỐI GOOGLE APPS SCRIPT
+        const scriptURL = 'https://script.google.com/macros/s/AKfycbyKBft9VDloKEt7rzSTtGd2lksnHp6evpI7max75pWFQXQ7I5u_4c_1tpcwq6d1TKvY/exec';
+
+        let currentPlayer = "";
+        let currentStationIndex = 0;
+        let score = 0;
+        let startTime = 0;
+        let timerInterval;
+
+        const screenStart = document.getElementById('screen-start');
+        const screenGame = document.getElementById('screen-game');
+        const screenLeaderboard = document.getElementById('screen-leaderboard');
+        const playerNameInput = document.getElementById('playerName');
+        const playerAnswerInput = document.getElementById('playerAnswer');
+        const stationName = document.getElementById('stationName');
+        const scoreDisplay = document.getElementById('scoreDisplay');
+        const timeDisplay = document.getElementById('timeDisplay');
+        const feedback = document.getElementById('feedback');
+        const finalResult = document.getElementById('finalResult');
+
+        function showScreen(screenElement) {
+            document.querySelectorAll('.screen').forEach(el => el.classList.remove('active'));
+            screenElement.classList.add('active');
+        }
+
+        // BẮT ĐẦU CHƠI
+        document.getElementById('btnStart').addEventListener('click', startGame);
+        playerNameInput.addEventListener('keypress', (e) => { if(e.key === 'Enter') startGame(); });
+
+        function startGame() {
+            if (playerNameInput.value.trim() === "") {
+                alert("Vui lòng nhập tên đội để bắt đầu!");
+                return;
+            }
+            currentPlayer = playerNameInput.value.trim();
+            currentStationIndex = 0;
+            score = 0;
+            
+            showScreen(screenGame);
+            loadStation();
+            
+            // Tính tổng thời gian chơi
+            startTime = Date.now();
+            timerInterval = setInterval(() => {
+                let elapsed = Math.floor((Date.now() - startTime) / 1000);
+                timeDisplay.innerText = `Thời gian: ${elapsed}s`;
+            }, 1000);
+        }
+
+        function loadStation() {
+            playerAnswerInput.value = "";
+            playerAnswerInput.focus();
+            feedback.innerText = "";
+            let current = stations[currentStationIndex];
+            stationName.innerText = current.name;
+            scoreDisplay.innerText = `Năng lượng: ${score}`;
+        }
+
+        document.getElementById('btnSubmitAnswer').addEventListener('click', checkAnswer);
+        playerAnswerInput.addEventListener('keypress', (e) => { if(e.key === 'Enter') checkAnswer(); });
+
+        function checkAnswer() {
+            document.getElementById('btnSubmitAnswer').disabled = true;
+
+            let userAnswer = playerAnswerInput.value.trim().toLowerCase();
+            let correctAnswer = stations[currentStationIndex].answer.toLowerCase();
+
+            if (userAnswer === correctAnswer) {
+                // Nhạc trả lời đúng
+                sfxCorrect.currentTime = 0;
+                sfxCorrect.play();
+
+                score += 10;
+                feedback.style.color = "var(--primary-glow)";
+                feedback.innerText = "Mã khóa chính xác! Cổng đã mở.";
+            } else {
+                // Nhạc trả lời sai
+                sfxWrong.currentTime = 0;
+                sfxWrong.play();
+
+                feedback.style.color = "var(--danger)";
+                feedback.innerText = "Sai mã khóa. Hệ thống ghi nhận thất bại tại trạm này.";
+            }
+
+            scoreDisplay.innerText = `Năng lượng: ${score}`;
+
+            setTimeout(() => {
+                currentStationIndex++;
+                document.getElementById('btnSubmitAnswer').disabled = false;
+                
+                if (currentStationIndex < stations.length) {
+                    loadStation();
+                } else {
+                    finishGame();
+                }
+            }, 1200);
+        }
+
+        function finishGame() {
+            clearInterval(timerInterval);
+            let totalTimeSeconds = Math.floor((Date.now() - startTime) / 1000);
+            
+            // Nhạc chiến thắng / hoàn thành
+            sfxWin.currentTime = 0;
+            sfxWin.play();
+
+            showScreen(screenLeaderboard);
+            finalResult.innerText = `Hoàn thành! Đạt ${score} điểm với tổng thời lượng ${totalTimeSeconds} giây.`;
+            document.getElementById('loadingLeaderboard').style.display = 'block';
+            document.getElementById('leaderboardTable').style.display = 'none';
+
+            const params = new URLSearchParams();
+            params.append('name', currentPlayer);
+            params.append('score', score);
+            params.append('time', totalTimeSeconds);
+
+            fetch(scriptURL, { method: 'POST', body: params })
+            .then(response => response.json())
+            .then(data => {
+                if(data.status === "success") {
+                    renderLeaderboard(data.leaderboard);
+                } else {
+                    document.getElementById('loadingLeaderboard').innerText = "Lỗi từ máy chủ: " + data.message;
+                }
+            })
+            .catch(error => {
+                document.getElementById('loadingLeaderboard').innerText = "Không thể tải bảng xếp hạng.";
+            });
+        }
+
+        // XEM BẢNG XẾP HẠNG TRỰC TIẾP
+        document.getElementById('btnViewLeaderboard').addEventListener('click', () => {
+            showScreen(screenLeaderboard);
+            finalResult.innerText = ""; 
+            document.getElementById('loadingLeaderboard').style.display = 'block';
+            document.getElementById('leaderboardTable').style.display = 'none';
+
+            fetch(scriptURL)
+            .then(response => response.json())
+            .then(data => {
+                if(data.status === "success") {
+                    renderLeaderboard(data.leaderboard);
+                } else {
+                    document.getElementById('loadingLeaderboard').innerText = "Lỗi từ máy chủ: " + data.message;
+                }
+            })
+            .catch(error => {
+                document.getElementById('loadingLeaderboard').innerText = "Không thể tải bảng xếp hạng.";
+            });
+        });
+
+        function renderLeaderboard(data) {
+            document.getElementById('loadingLeaderboard').style.display = 'none';
+            const table = document.getElementById('leaderboardTable');
+            const tbody = document.getElementById('leaderboardBody');
+            table.style.display = 'table';
+            tbody.innerHTML = '';
+
+            data.forEach((player, index) => {
+                let rankClass = index === 0 ? 'rank-1' : (index === 1 ? 'rank-2' : (index === 2 ? 'rank-3' : ''));
+                let row = `<tr>
+                    <td class="${rankClass}">#${index + 1}</td>
+                    <td class="${rankClass}">${player.name}</td>
+                    <td>${player.score}</td>
+                    <td>${player.time}s</td>
+                </tr>`;
+                tbody.innerHTML += row;
+            });
+        }
+    </script>
+</body>
+</html>

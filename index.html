@@ -38,6 +38,7 @@
             width: 90%; max-width: 450px;
             backdrop-filter: blur(10px);
             text-align: center;
+            position: relative;
         }
 
         .screen { display: none; }
@@ -71,14 +72,19 @@
         .btn:hover { background: linear-gradient(45deg, #059669, #34d399); transform: translateY(-2px); box-shadow: 0 5px 15px rgba(16, 185, 129, 0.4); }
         .btn:disabled { background: #4b5563; cursor: not-allowed; transform: none; box-shadow: none; }
         
-        .btn-secondary {
-            background: transparent; border: 1px solid var(--primary-glow); color: var(--primary-glow);
-        }
+        .btn-secondary { background: transparent; border: 1px solid var(--primary-glow); color: var(--primary-glow); }
         .btn-secondary:hover { background: rgba(16, 185, 129, 0.1); }
 
-        .hud { display: flex; justify-content: space-between; margin-bottom: 20px; font-size: 14px; font-weight: 600; color: var(--accent); }
+        .hud { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; font-size: 14px; font-weight: 600; color: var(--accent); }
         .station-title { font-size: 24px; color: var(--primary-glow); margin-bottom: 25px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; }
         
+        /* Nút bật tắt nhạc */
+        #btnToggleSound {
+            background: rgba(16, 185, 129, 0.2); border: 1px solid var(--primary-glow); color: var(--primary-glow);
+            border-radius: 20px; padding: 4px 12px; font-size: 12px; cursor: pointer; outline: none; transition: 0.3s;
+        }
+        #btnToggleSound:hover { background: rgba(16, 185, 129, 0.4); }
+
         .leaderboard-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
         .leaderboard-table th, .leaderboard-table td { padding: 10px; border-bottom: 1px solid #374151; text-align: left; }
         .leaderboard-table th { color: var(--primary-glow); font-size: 12px; text-transform: uppercase; }
@@ -90,6 +96,10 @@
     </style>
 </head>
 <body>
+
+    <audio id="bgMusic" loop>
+        <source src="mecung.mp3" type="audio/mpeg">
+    </audio>
 
     <div class="container">
         <div id="screen-start" class="screen active">
@@ -103,6 +113,7 @@
         <div id="screen-game" class="screen">
             <div class="hud">
                 <span id="scoreDisplay">Năng lượng: 0</span>
+                <button id="btnToggleSound">🔊 Nhạc</button>
                 <span id="timeDisplay">Thời gian: 0s</span>
             </div>
             <div class="station-title" id="stationName">Trạm 1</div>
@@ -134,10 +145,25 @@
     </div>
 
     <script>
-        // CẤU HÌNH ÂM THANH MP3 (Hỗ trợ tốt trên iOS/Safari)
+        // CẤU HÌNH ÂM THANH HIỆU ỨNG (SFX)
         const sfxCorrect = new Audio('https://www.myinstants.com/media/sounds/correct.mp3');
         const sfxWrong = new Audio('https://www.myinstants.com/media/sounds/wrong-buzzer.mp3');
         const sfxWin = new Audio('https://www.myinstants.com/media/sounds/level-up.mp3');
+
+        // CẤU HÌNH NHẠC NỀN
+        const bgMusic = document.getElementById('bgMusic');
+        bgMusic.volume = 0.4; // Đặt âm lượng nhạc nền mức 40% để không lấn át tiếng hiệu ứng
+
+        // ĐIỀU KHIỂN BẬT/TẮT NHẠC
+        document.getElementById('btnToggleSound').addEventListener('click', () => {
+            if (bgMusic.paused) {
+                bgMusic.play();
+                document.getElementById('btnToggleSound').innerText = "🔊 Nhạc";
+            } else {
+                bgMusic.pause();
+                document.getElementById('btnToggleSound').innerText = "🔇 Tắt";
+            }
+        });
 
         // MÃ KHÓA 4 TRẠM
         const stations = [
@@ -181,6 +207,10 @@
                 alert("Vui lòng nhập tên đội để bắt đầu!");
                 return;
             }
+            
+            // Kích hoạt nhạc nền ngay khi bấm nút Bắt đầu
+            bgMusic.play().catch(e => console.log("Trình duyệt tạm chặn Autoplay"));
+
             currentPlayer = playerNameInput.value.trim();
             currentStationIndex = 0;
             score = 0;
@@ -188,7 +218,6 @@
             showScreen(screenGame);
             loadStation();
             
-            // Tính tổng thời gian chơi
             startTime = Date.now();
             timerInterval = setInterval(() => {
                 let elapsed = Math.floor((Date.now() - startTime) / 1000);
@@ -215,18 +244,14 @@
             let correctAnswer = stations[currentStationIndex].answer.toLowerCase();
 
             if (userAnswer === correctAnswer) {
-                // Nhạc trả lời đúng
                 sfxCorrect.currentTime = 0;
                 sfxCorrect.play();
-
                 score += 10;
                 feedback.style.color = "var(--primary-glow)";
                 feedback.innerText = "Mã khóa chính xác! Cổng đã mở.";
             } else {
-                // Nhạc trả lời sai
                 sfxWrong.currentTime = 0;
                 sfxWrong.play();
-
                 feedback.style.color = "var(--danger)";
                 feedback.innerText = "Sai mã khóa. Hệ thống ghi nhận thất bại tại trạm này.";
             }
@@ -249,7 +274,6 @@
             clearInterval(timerInterval);
             let totalTimeSeconds = Math.floor((Date.now() - startTime) / 1000);
             
-            // Nhạc chiến thắng / hoàn thành
             sfxWin.currentTime = 0;
             sfxWin.play();
 

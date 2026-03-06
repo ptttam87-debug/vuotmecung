@@ -78,7 +78,6 @@
         .hud { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; font-size: 14px; font-weight: 600; color: var(--accent); }
         .station-title { font-size: 24px; color: var(--primary-glow); margin-bottom: 25px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; }
         
-        /* Nút bật tắt nhạc */
         #btnToggleSound {
             background: rgba(16, 185, 129, 0.2); border: 1px solid var(--primary-glow); color: var(--primary-glow);
             border-radius: 20px; padding: 4px 12px; font-size: 12px; cursor: pointer; outline: none; transition: 0.3s;
@@ -92,8 +91,15 @@
         .rank-2 { color: #d1d5db; font-weight: bold; }
         .rank-3 { color: #b45309; font-weight: bold; }
 
-        #loadingLeaderboard { color: var(--primary-glow); font-size: 14px; margin-top: 15px; }
+        #liveIndicator {
+            display: inline-block; width: 8px; height: 8px; background: #ef4444; border-radius: 50%;
+            margin-right: 5px; animation: blink 1s infinite;
+        }
+        @keyframes blink { 0% {opacity: 1;} 50% {opacity: 0.4;} 100% {opacity: 1;} }
     </style>
+
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 </head>
 <body>
 
@@ -125,10 +131,10 @@
 
         <div id="screen-leaderboard" class="screen">
             <h1>BẢNG VÀNG</h1>
-            <p class="subtitle">Top 10 Đội Khám Phá Xuất Sắc Nhất</p>
+            <p class="subtitle"><span id="liveIndicator"></span>Cập nhật trực tiếp</p>
             <p id="finalResult" style="color: var(--primary-glow); font-weight: bold; margin-bottom: 20px;"></p>
-            <div id="loadingLeaderboard">Đang đồng bộ dữ liệu với hệ thống trung tâm...</div>
-            <table class="leaderboard-table" id="leaderboardTable" style="display: none;">
+            
+            <table class="leaderboard-table" id="leaderboardTable">
                 <thead>
                     <tr>
                         <th>Hạng</th>
@@ -145,27 +151,42 @@
     </div>
 
     <script>
-        // CẤU HÌNH ÂM THANH HIỆU ỨNG (SFX)
+        // ==========================================
+        // KHỞI TẠO FIREBASE (ĐÃ CẬP NHẬT DATABASE CHÂU Á)
+        // ==========================================
+        const firebaseConfig = {
+            apiKey: "AIzaSyB1b8fzYweiF5v5eokhpfLJkA336NIELB8",
+            authDomain: "vuotmecung.firebaseapp.com",
+            databaseURL: "https://vuotmecung-default-rtdb.asia-southeast1.firebasedatabase.app/",
+            projectId: "vuotmecung",
+            storageBucket: "vuotmecung.firebasestorage.app",
+            messagingSenderId: "480201793770",
+            appId: "1:480201793770:web:1a817e80ca9d7d8a66b793"
+        };
+        
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+        const leaderboardRef = database.ref('vuot_me_cung_leaderboard');
+
+        // ==========================================
+        // CẤU HÌNH ÂM THANH VÀ TRẠM
+        // ==========================================
         const sfxCorrect = new Audio('https://www.myinstants.com/media/sounds/correct.mp3');
         const sfxWrong = new Audio('https://www.myinstants.com/media/sounds/wrong-buzzer.mp3');
         const sfxWin = new Audio('https://www.myinstants.com/media/sounds/level-up.mp3');
-
-        // CẤU HÌNH NHẠC NỀN
         const bgMusic = document.getElementById('bgMusic');
-        bgMusic.volume = 0.4; // Đặt âm lượng nhạc nền mức 40% để không lấn át tiếng hiệu ứng
+        bgMusic.volume = 0.4;
 
-        // ĐIỀU KHIỂN BẬT/TẮT NHẠC
         document.getElementById('btnToggleSound').addEventListener('click', () => {
-            if (bgMusic.paused) {
-                bgMusic.play();
-                document.getElementById('btnToggleSound').innerText = "🔊 Nhạc";
-            } else {
-                bgMusic.pause();
-                document.getElementById('btnToggleSound').innerText = "🔇 Tắt";
+            if (bgMusic.paused) { 
+                bgMusic.play(); 
+                document.getElementById('btnToggleSound').innerText = "🔊 Nhạc"; 
+            } else { 
+                bgMusic.pause(); 
+                document.getElementById('btnToggleSound').innerText = "🔇 Tắt"; 
             }
         });
 
-        // MÃ KHÓA 4 TRẠM
         const stations = [
             { name: "Trạm 1: Khởi Nguyên", answer: "3954" },
             { name: "Trạm 2: Ảo Ảnh", answer: "2038" },
@@ -173,9 +194,6 @@
             { name: "Trạm 4: Cốt Lõi", answer: "1559" }
         ];
         
-        // KẾT NỐI GOOGLE APPS SCRIPT
-        const scriptURL = 'https://script.google.com/macros/s/AKfycbyKBft9VDloKEt7rzSTtGd2lksnHp6evpI7max75pWFQXQ7I5u_4c_1tpcwq6d1TKvY/exec';
-
         let currentPlayer = "";
         let currentStationIndex = 0;
         let score = 0;
@@ -198,24 +216,20 @@
             screenElement.classList.add('active');
         }
 
-        // BẮT ĐẦU CHƠI
         document.getElementById('btnStart').addEventListener('click', startGame);
         playerNameInput.addEventListener('keypress', (e) => { if(e.key === 'Enter') startGame(); });
 
         function startGame() {
-            if (playerNameInput.value.trim() === "") {
-                alert("Vui lòng nhập tên đội để bắt đầu!");
-                return;
-            }
+            if (playerNameInput.value.trim() === "") { alert("Vui lòng nhập tên đội để bắt đầu!"); return; }
             
-            // Kích hoạt nhạc nền ngay khi bấm nút Bắt đầu
-            bgMusic.play().catch(e => console.log("Trình duyệt tạm chặn Autoplay"));
-
+            // Kích hoạt nhạc khi bấm bắt đầu
+            bgMusic.play().catch(e => console.log("Trình duyệt chặn Autoplay cho đến khi có tương tác"));
+            
             currentPlayer = playerNameInput.value.trim();
-            currentStationIndex = 0;
+            currentStationIndex = 0; 
             score = 0;
             
-            showScreen(screenGame);
+            showScreen(screenGame); 
             loadStation();
             
             startTime = Date.now();
@@ -226,11 +240,10 @@
         }
 
         function loadStation() {
-            playerAnswerInput.value = "";
-            playerAnswerInput.focus();
+            playerAnswerInput.value = ""; 
+            playerAnswerInput.focus(); 
             feedback.innerText = "";
-            let current = stations[currentStationIndex];
-            stationName.innerText = current.name;
+            stationName.innerText = stations[currentStationIndex].name;
             scoreDisplay.innerText = `Năng lượng: ${score}`;
         }
 
@@ -239,94 +252,82 @@
 
         function checkAnswer() {
             document.getElementById('btnSubmitAnswer').disabled = true;
-
             let userAnswer = playerAnswerInput.value.trim().toLowerCase();
             let correctAnswer = stations[currentStationIndex].answer.toLowerCase();
 
             if (userAnswer === correctAnswer) {
-                sfxCorrect.currentTime = 0;
+                sfxCorrect.currentTime = 0; 
                 sfxCorrect.play();
                 score += 10;
-                feedback.style.color = "var(--primary-glow)";
+                feedback.style.color = "var(--primary-glow)"; 
                 feedback.innerText = "Mã khóa chính xác! Cổng đã mở.";
             } else {
-                sfxWrong.currentTime = 0;
+                sfxWrong.currentTime = 0; 
                 sfxWrong.play();
-                feedback.style.color = "var(--danger)";
-                feedback.innerText = "Sai mã khóa. Hệ thống ghi nhận thất bại tại trạm này.";
+                feedback.style.color = "var(--danger)"; 
+                feedback.innerText = "Sai mã khóa. Thất bại tại trạm này.";
             }
-
             scoreDisplay.innerText = `Năng lượng: ${score}`;
 
             setTimeout(() => {
                 currentStationIndex++;
                 document.getElementById('btnSubmitAnswer').disabled = false;
-                
-                if (currentStationIndex < stations.length) {
-                    loadStation();
-                } else {
-                    finishGame();
+                if (currentStationIndex < stations.length) { 
+                    loadStation(); 
+                } else { 
+                    finishGame(); 
                 }
             }, 1200);
         }
 
+        // ==========================================
+        // FIREBASE: GỬI ĐIỂM VÀ LẮNG NGHE BẢNG XẾP HẠNG
+        // ==========================================
         function finishGame() {
             clearInterval(timerInterval);
             let totalTimeSeconds = Math.floor((Date.now() - startTime) / 1000);
             
-            sfxWin.currentTime = 0;
+            sfxWin.currentTime = 0; 
             sfxWin.play();
 
             showScreen(screenLeaderboard);
             finalResult.innerText = `Hoàn thành! Đạt ${score} điểm với tổng thời lượng ${totalTimeSeconds} giây.`;
-            document.getElementById('loadingLeaderboard').style.display = 'block';
-            document.getElementById('leaderboardTable').style.display = 'none';
 
-            const params = new URLSearchParams();
-            params.append('name', currentPlayer);
-            params.append('score', score);
-            params.append('time', totalTimeSeconds);
-
-            fetch(scriptURL, { method: 'POST', body: params })
-            .then(response => response.json())
-            .then(data => {
-                if(data.status === "success") {
-                    renderLeaderboard(data.leaderboard);
-                } else {
-                    document.getElementById('loadingLeaderboard').innerText = "Lỗi từ máy chủ: " + data.message;
-                }
-            })
-            .catch(error => {
-                document.getElementById('loadingLeaderboard').innerText = "Không thể tải bảng xếp hạng.";
+            // Ghi dữ liệu trực tiếp lên Firebase
+            leaderboardRef.push({
+                name: currentPlayer,
+                score: score,
+                time: totalTimeSeconds,
+                timestamp: firebase.database.ServerValue.TIMESTAMP
             });
         }
 
-        // XEM BẢNG XẾP HẠNG TRỰC TIẾP
+        // Xem bảng xếp hạng không cần chơi
         document.getElementById('btnViewLeaderboard').addEventListener('click', () => {
             showScreen(screenLeaderboard);
             finalResult.innerText = ""; 
-            document.getElementById('loadingLeaderboard').style.display = 'block';
-            document.getElementById('leaderboardTable').style.display = 'none';
+        });
 
-            fetch(scriptURL)
-            .then(response => response.json())
-            .then(data => {
-                if(data.status === "success") {
-                    renderLeaderboard(data.leaderboard);
-                } else {
-                    document.getElementById('loadingLeaderboard').innerText = "Lỗi từ máy chủ: " + data.message;
-                }
-            })
-            .catch(error => {
-                document.getElementById('loadingLeaderboard').innerText = "Không thể tải bảng xếp hạng.";
+        // LẮNG NGHE DỮ LIỆU REAL-TIME (Tự động cập nhật khi có người gửi điểm)
+        leaderboardRef.on('value', (snapshot) => {
+            let data = [];
+            snapshot.forEach((childSnapshot) => {
+                data.push(childSnapshot.val());
             });
+
+            // Thuật toán Xếp hạng: Điểm cao lên trên, Thời gian ít lên trên
+            data.sort((a, b) => {
+                if (b.score !== a.score) return b.score - a.score;
+                return a.time - b.time;
+            });
+
+            // Chỉ hiển thị Top 10
+            let top10 = data.slice(0, 10);
+            renderLeaderboard(top10);
         });
 
         function renderLeaderboard(data) {
-            document.getElementById('loadingLeaderboard').style.display = 'none';
-            const table = document.getElementById('leaderboardTable');
             const tbody = document.getElementById('leaderboardBody');
-            table.style.display = 'table';
             tbody.innerHTML = '';
 
             data.forEach((player, index) => {

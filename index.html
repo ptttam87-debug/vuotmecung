@@ -152,7 +152,7 @@
 
     <script>
         // ==========================================
-        // KHỞI TẠO FIREBASE (ĐÃ CẬP NHẬT DATABASE CHÂU Á)
+        // KHỞI TẠO FIREBASE
         // ==========================================
         const firebaseConfig = {
             apiKey: "AIzaSyB1b8fzYweiF5v5eokhpfLJkA336NIELB8",
@@ -166,7 +166,9 @@
         
         firebase.initializeApp(firebaseConfig);
         const database = firebase.database();
-        const leaderboardRef = database.ref('vuot_me_cung_leaderboard');
+        
+        // Tạo bảng sạch hoàn toàn để thử nghiệm lại
+        const leaderboardRef = database.ref('bang_diem_chinh_thuc');
 
         // ==========================================
         // CẤU HÌNH ÂM THANH VÀ TRẠM
@@ -222,8 +224,7 @@
         function startGame() {
             if (playerNameInput.value.trim() === "") { alert("Vui lòng nhập tên đội để bắt đầu!"); return; }
             
-            // Kích hoạt nhạc khi bấm bắt đầu
-            bgMusic.play().catch(e => console.log("Trình duyệt chặn Autoplay cho đến khi có tương tác"));
+            bgMusic.play().catch(e => console.log("Trình duyệt chặn Autoplay"));
             
             currentPlayer = playerNameInput.value.trim();
             currentStationIndex = 0; 
@@ -281,7 +282,7 @@
         }
 
         // ==========================================
-        // FIREBASE: GỬI ĐIỂM VÀ LẮNG NGHE BẢNG XẾP HẠNG
+        // GHI ĐIỂM VÀO FIREBASE (CÓ CẢNH BÁO NẾU LỖI)
         // ==========================================
         function finishGame() {
             clearInterval(timerInterval);
@@ -293,12 +294,15 @@
             showScreen(screenLeaderboard);
             finalResult.innerText = `Hoàn thành! Đạt ${score} điểm với tổng thời lượng ${totalTimeSeconds} giây.`;
 
-            // Ghi dữ liệu trực tiếp lên Firebase
+            // Lệnh push tạo dòng mới kèm theo bộ bắt lỗi
             leaderboardRef.push({
                 name: currentPlayer,
                 score: score,
                 time: totalTimeSeconds,
                 timestamp: firebase.database.ServerValue.TIMESTAMP
+            }).catch(function(error) {
+                // Nếu quy tắc Rules trên Firebase bị sai, thông báo này sẽ bật lên
+                alert("LỖI LƯU ĐIỂM: Hệ thống Firebase từ chối dữ liệu (" + error.message + "). Vui lòng kiểm tra lại tab Rules!");
             });
         }
 
@@ -308,20 +312,29 @@
             finalResult.innerText = ""; 
         });
 
-        // LẮNG NGHE DỮ LIỆU REAL-TIME (Tự động cập nhật khi có người gửi điểm)
+        // ==========================================
+        // ĐỌC BẢNG XẾP HẠNG (CÓ BỘ LỌC CHỐNG LỖI)
+        // ==========================================
         leaderboardRef.on('value', (snapshot) => {
             let data = [];
             snapshot.forEach((childSnapshot) => {
-                data.push(childSnapshot.val());
+                let item = childSnapshot.val();
+                
+                // Chỉ lấy những dòng dữ liệu có chứa Tên Đội (Lọc bỏ rác)
+                if(item && item.name) {
+                    item.score = Number(item.score) || 0;
+                    item.time = Number(item.time) || 0;
+                    data.push(item);
+                }
             });
 
-            // Thuật toán Xếp hạng: Điểm cao lên trên, Thời gian ít lên trên
+            // Xếp hạng: Điểm cao lên trên, Thời gian ít lên trên
             data.sort((a, b) => {
                 if (b.score !== a.score) return b.score - a.score;
                 return a.time - b.time;
             });
 
-            // Chỉ hiển thị Top 10
+            // Lấy Top 10
             let top10 = data.slice(0, 10);
             renderLeaderboard(top10);
         });

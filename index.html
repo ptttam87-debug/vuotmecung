@@ -100,9 +100,7 @@
         
         .timer-warning { color: var(--danger) !important; animation: blink 1s infinite; }
 
-        /* ==========================================
-           PHONG CÁCH MODAL TÙY CHỈNH MỚI
-           ========================================== */
+        /* PHONG CÁCH MODAL TÙY CHỈNH */
         .modal-overlay {
             display: none; 
             position: fixed;
@@ -196,21 +194,17 @@
     </div>
 
     <script>
-        // ==========================================
         // CHỐNG GIAN LẬN: KHÓA CHUỘT PHẢI & PHÍM TẮT F12, CTRL+U
-        // ==========================================
         document.addEventListener('contextmenu', event => event.preventDefault());
         document.addEventListener('keydown', event => {
-            if (event.keyCode === 123 || // F12
-               (event.ctrlKey && event.shiftKey && (event.keyCode === 73 || event.keyCode === 74 || event.keyCode === 67)) || // Ctrl+Shift+I/J/C
-               (event.ctrlKey && event.keyCode === 85)) { // Ctrl+U
+            if (event.keyCode === 123 || 
+               (event.ctrlKey && event.shiftKey && (event.keyCode === 73 || event.keyCode === 74 || event.keyCode === 67)) || 
+               (event.ctrlKey && event.keyCode === 85)) { 
                 event.preventDefault();
             }
         });
 
-        // ==========================================
         // KHỞI TẠO FIREBASE
-        // ==========================================
         const firebaseConfig = {
             apiKey: "AIzaSyB1b8fzYweiF5v5eokhpfLJkA336NIELB8",
             authDomain: "vuotmecung.firebaseapp.com",
@@ -225,9 +219,7 @@
         const database = firebase.database();
         const leaderboardRef = database.ref('vuot_me_cung_leaderboard');
 
-        // ==========================================
         // CẤU HÌNH ÂM THANH
-        // ==========================================
         const sfxCorrect = new Audio('https://www.myinstants.com/media/sounds/correct.mp3');
         const sfxWrong = new Audio('https://www.myinstants.com/media/sounds/wrong-buzzer.mp3');
         const sfxWin = new Audio('https://www.myinstants.com/media/sounds/level-up.mp3');
@@ -254,8 +246,9 @@
         let currentPlayer = "";
         let currentStationIndex = 0;
         let score = 0;
-        let timeLeft = 900; // Đã đổi thành 15 phút = 900 giây
+        let timeLeft = 0; 
         let timerInterval;
+        const TOTAL_GAME_TIME_SEC = 900; // 15 phút
 
         const screenStart = document.getElementById('screen-start');
         const screenGame = document.getElementById('screen-game');
@@ -288,6 +281,7 @@
 
             const keyHandler = (e) => {
                 if (e.key === 'Enter') {
+                    e.preventDefault();
                     closeHandler();
                 }
             };
@@ -301,50 +295,96 @@
             screenElement.classList.add('active');
         }
 
+        // TỰ ĐỘNG KHÔI PHỤC KHI TẢI LẠI TRANG
+        window.onload = () => {
+            if (localStorage.getItem("vuotmecung_status") === "playing") {
+                showGameModal("ĐANG KHÔI PHỤC", "Phát hiện phiên chơi đang dang dở. Nhấn Xác Nhận để tiếp tục làm bài (Thời gian vẫn được tính trong lúc bạn thoát).", function() {
+                    resumeGame();
+                    bgMusic.play().catch(e => console.log(e));
+                });
+            }
+        };
+
         document.getElementById('btnStart').addEventListener('click', startGame);
         playerNameInput.addEventListener('keypress', (e) => { if(e.key === 'Enter') startGame(); });
 
         function startGame() {
-            if (playerNameInput.value.trim() === "") { 
-                showGameModal("CẢNH BÁO", "Vui lòng nhập tên đội để bắt đầu!");
-                return; 
-            }
-            
-            if (localStorage.getItem("vuotmecung_played")) {
+            if (localStorage.getItem("vuotmecung_status") === "finished") {
                 showGameModal("Hệ Thống Khóa", "Đội của bạn đã sử dụng hết 1 lượt chơi duy nhất. Hệ thống sẽ chuyển đến Bảng Vàng.", function() {
                     showScreen(screenLeaderboard);
                 });
                 return;
             }
 
-            bgMusic.play().catch(e => console.log("Trình duyệt chặn Autoplay cho đến khi có tương tác"));
-            localStorage.setItem("vuotmecung_played", "true");
+            if (playerNameInput.value.trim() === "") { 
+                showGameModal("CẢNH BÁO", "Vui lòng nhập tên đội để bắt đầu!");
+                return; 
+            }
 
+            bgMusic.play().catch(e => console.log("Trình duyệt chặn Autoplay"));
+            
             currentPlayer = playerNameInput.value.trim();
             currentStationIndex = 0; 
             score = 0;
-            timeLeft = 900; // Reset thành 900 giây (15 phút)
-            timeDisplay.classList.remove('timer-warning');
-            
+            let endTime = Date.now() + (TOTAL_GAME_TIME_SEC * 1000); // Lưu mốc thời gian kết thúc
+
+            // LƯU TRẠNG THÁI MỚI VÀO BỘ NHỚ
+            localStorage.setItem("vuotmecung_status", "playing");
+            localStorage.setItem("vuotmecung_playerName", currentPlayer);
+            localStorage.setItem("vuotmecung_stationIndex", currentStationIndex);
+            localStorage.setItem("vuotmecung_score", score);
+            localStorage.setItem("vuotmecung_endTime", endTime);
+
+            startTimer(endTime);
             showScreen(screenGame); 
             loadStation();
-            
-            // THUẬT TOÁN ĐẾM NGƯỢC 15 PHÚT
+        }
+
+        function resumeGame() {
+            currentPlayer = localStorage.getItem("vuotmecung_playerName");
+            currentStationIndex = parseInt(localStorage.getItem("vuotmecung_stationIndex"));
+            score = parseInt(localStorage.getItem("vuotmecung_score"));
+            let endTime = parseInt(localStorage.getItem("vuotmecung_endTime"));
+
+            // Nếu đã quá thời gian kết thúc lúc mở lại trang
+            if (Date.now() >= endTime) {
+                timeLeft = 0;
+                timeDisplay.innerText = "Thời gian: 0:00";
+                showGameModal("HẾT GIỜ", "Thời gian làm bài của bạn đã hết trong lúc đóng trình duyệt.", function() {
+                    finishGame(true);
+                });
+                return;
+            }
+
+            startTimer(endTime);
+            showScreen(screenGame);
+            loadStation();
+        }
+
+        function startTimer(endTime) {
+            clearInterval(timerInterval);
+            timeDisplay.classList.remove('timer-warning');
+
             timerInterval = setInterval(() => {
-                timeLeft--;
+                let now = Date.now();
+                timeLeft = Math.floor((endTime - now) / 1000);
+
+                if (timeLeft <= 0) {
+                    clearInterval(timerInterval);
+                    timeLeft = 0;
+                    timeDisplay.innerText = "Thời gian: 0:00";
+                    showGameModal("HẾT GIỜ", "Đã hết 15 phút! Hệ thống tự động khóa và nộp bài hiện tại.", function() {
+                        finishGame(true);
+                    });
+                    return;
+                }
+
                 let minutes = Math.floor(timeLeft / 60);
                 let seconds = timeLeft % 60;
                 timeDisplay.innerText = `Thời gian: ${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
 
                 if (timeLeft <= 60) {
-                    timeDisplay.classList.add('timer-warning'); // Cảnh báo nhấp nháy đỏ
-                }
-
-                if (timeLeft <= 0) {
-                    clearInterval(timerInterval);
-                    showGameModal("HẾT GIỜ", "Đã hết 15 phút! Hệ thống tự động khóa và nộp bài hiện tại.", function() {
-                        finishGame(true);
-                    });
+                    timeDisplay.classList.add('timer-warning');
                 }
             }, 1000);
         }
@@ -363,13 +403,13 @@
         function checkAnswer() {
             document.getElementById('btnSubmitAnswer').disabled = true;
             let userAnswer = playerAnswerInput.value.trim();
-            
             let hashedUserAnswer = btoa(userAnswer);
 
             if (hashedUserAnswer === stations[currentStationIndex].answerHash) {
                 sfxCorrect.currentTime = 0; 
                 sfxCorrect.play();
                 score += 10;
+                localStorage.setItem("vuotmecung_score", score); // Cập nhật điểm ngay lập tức
                 feedback.style.color = "var(--primary-glow)"; 
                 feedback.innerText = "Mã khóa chính xác! Cổng đã mở.";
             } else {
@@ -383,7 +423,9 @@
             setTimeout(() => {
                 currentStationIndex++;
                 document.getElementById('btnSubmitAnswer').disabled = false;
+                
                 if (currentStationIndex < stations.length) { 
+                    localStorage.setItem("vuotmecung_stationIndex", currentStationIndex); // Cập nhật trạm
                     loadStation(); 
                 } else { 
                     finishGame(false); 
@@ -393,7 +435,10 @@
 
         function finishGame(isTimeout = false) {
             clearInterval(timerInterval);
-            let timeUsed = 900 - timeLeft; // Tính điểm dựa trên 900 giây
+            localStorage.setItem("vuotmecung_status", "finished"); // Khóa không cho chơi lại
+            
+            let timeUsed = TOTAL_GAME_TIME_SEC - timeLeft; 
+            if (timeUsed > TOTAL_GAME_TIME_SEC) timeUsed = TOTAL_GAME_TIME_SEC;
             
             sfxWin.currentTime = 0; 
             sfxWin.play();

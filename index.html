@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vượt Mê Cung </title>
+    <title>Vượt Mê Cung - Phiên Bản Nâng Cấp</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=Montserrat:wght@400;600&display=swap');
 
@@ -53,7 +53,7 @@
             text-shadow: 0 0 15px rgba(251, 191, 36, 0.5);
         }
 
-        p.subtitle { color: #9ca3af; font-size: 14px; margin-bottom: 25px; }
+        p.subtitle { color: #9ca3af; font-size: 14px; margin-bottom: 25px; line-height: 1.5; }
         .instruction { color: #d1d5db; font-size: 15px; margin-bottom: 20px; font-style: italic; }
 
         input[type="text"] {
@@ -97,12 +97,14 @@
             margin-right: 5px; animation: blink 1s infinite;
         }
         @keyframes blink { 0% {opacity: 1;} 50% {opacity: 0.4;} 100% {opacity: 1;} }
+        
+        .timer-warning { color: var(--danger) !important; animation: blink 1s infinite; }
 
         /* ==========================================
            PHONG CÁCH MODAL TÙY CHỈNH MỚI
            ========================================== */
         .modal-overlay {
-            display: none; /* Ban đầu ẩn */
+            display: none; 
             position: fixed;
             top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0, 0, 0, 0.7);
@@ -146,7 +148,7 @@
     <div class="container">
         <div id="screen-start" class="screen active">
             <h1>VƯỢT MÊ CUNG</h1>
-            <p class="subtitle">Nhập tên đội của bạn để bắt đầu hành trình</p>
+            <p class="subtitle">Nhập tên đội của bạn để bắt đầu hành trình<br><span style="color:var(--danger); font-size: 12px;">(Lưu ý: Bạn chỉ có 1 lượt chơi duy nhất trong 15 phút)</span></p>
             <input type="text" id="playerName" placeholder="Tên Đội / Mã số..." autocomplete="off">
             <button class="btn" id="btnStart">Tiến Vào Mê Cung (Enter)</button>
             <button class="btn btn-secondary" id="btnViewLeaderboard">Xem Bảng Vàng Top 10</button>
@@ -156,7 +158,7 @@
             <div class="hud">
                 <span id="scoreDisplay">Năng lượng: 0</span>
                 <button id="btnToggleSound">🔊 Nhạc</button>
-                <span id="timeDisplay">Thời gian: 0s</span>
+                <span id="timeDisplay">Thời gian: 15:00</span>
             </div>
             <div class="station-title" id="stationName">Trạm 1</div>
             <div class="instruction">Tiến hành giải mã và nhập đáp án để mở cổng</div>
@@ -180,9 +182,9 @@
                     </tr>
                 </thead>
                 <tbody id="leaderboardBody">
-                    </tbody>
+                </tbody>
             </table>
-            </div>
+        </div>
     </div>
 
     <div class="modal-overlay" id="modalOverlay">
@@ -207,7 +209,7 @@
         });
 
         // ==========================================
-        // KHỞI TẠO FIREBASE (ĐÃ CẬP NHẬT DATABASE CHÂU Á)
+        // KHỞI TẠO FIREBASE
         // ==========================================
         const firebaseConfig = {
             apiKey: "AIzaSyB1b8fzYweiF5v5eokhpfLJkA336NIELB8",
@@ -224,7 +226,7 @@
         const leaderboardRef = database.ref('vuot_me_cung_leaderboard');
 
         // ==========================================
-        // CẤU HÌNH ÂM THANH VÀ TRẠM
+        // CẤU HÌNH ÂM THANH
         // ==========================================
         const sfxCorrect = new Audio('https://www.myinstants.com/media/sounds/correct.mp3');
         const sfxWrong = new Audio('https://www.myinstants.com/media/sounds/wrong-buzzer.mp3');
@@ -252,7 +254,7 @@
         let currentPlayer = "";
         let currentStationIndex = 0;
         let score = 0;
-        let startTime = 0;
+        let timeLeft = 900; // Đã đổi thành 15 phút = 900 giây
         let timerInterval;
 
         const screenStart = document.getElementById('screen-start');
@@ -266,22 +268,17 @@
         const feedback = document.getElementById('feedback');
         const finalResult = document.getElementById('finalResult');
 
-        // Các phần tử modal mới
         const modalOverlay = document.getElementById('modalOverlay');
         const modalTitle = document.getElementById('modalTitle');
         const modalMessage = document.getElementById('modalMessage');
         const modalButton = document.getElementById('modalButton');
 
-        // ==========================================
-        // HÀM HIỂN THỊ MODAL TÙY CHỈNH MỚI
-        // ==========================================
         function showGameModal(title, message, callback) {
             modalTitle.innerText = title;
             modalMessage.innerText = message;
             modalOverlay.classList.add('active');
-            modalButton.focus(); // Tập trung vào nút xác nhận
+            modalButton.focus();
 
-            // Xử lý sự kiện nút xác nhận
             const closeHandler = () => {
                 modalOverlay.classList.remove('active');
                 modalButton.removeEventListener('click', closeHandler);
@@ -289,7 +286,6 @@
                 if (callback) callback();
             };
 
-            // Xử lý sự kiện phím Enter
             const keyHandler = (e) => {
                 if (e.key === 'Enter') {
                     closeHandler();
@@ -309,38 +305,47 @@
         playerNameInput.addEventListener('keypress', (e) => { if(e.key === 'Enter') startGame(); });
 
         function startGame() {
-            // Thay thế alert tiêu chuẩn bằng modal tùy chỉnh
             if (playerNameInput.value.trim() === "") { 
                 showGameModal("CẢNH BÁO", "Vui lòng nhập tên đội để bắt đầu!");
                 return; 
             }
             
-            // CHỐNG CHƠI LẠI: Kiểm tra localStorage xem có 'played' không
             if (localStorage.getItem("vuotmecung_played")) {
-                // Thay thế alert "lượt chơi duy nhất" bằng modal tùy chỉnh khớp style
                 showGameModal("Hệ Thống Khóa", "Đội của bạn đã sử dụng hết 1 lượt chơi duy nhất. Hệ thống sẽ chuyển đến Bảng Vàng.", function() {
                     showScreen(screenLeaderboard);
                 });
                 return;
             }
 
-            // Kích hoạt nhạc khi bấm bắt đầu
             bgMusic.play().catch(e => console.log("Trình duyệt chặn Autoplay cho đến khi có tương tác"));
-            
-            // Đặt 'played' trong localStorage để đánh dấu lần chơi này
             localStorage.setItem("vuotmecung_played", "true");
 
             currentPlayer = playerNameInput.value.trim();
             currentStationIndex = 0; 
             score = 0;
+            timeLeft = 900; // Reset thành 900 giây (15 phút)
+            timeDisplay.classList.remove('timer-warning');
             
             showScreen(screenGame); 
             loadStation();
             
-            startTime = Date.now();
+            // THUẬT TOÁN ĐẾM NGƯỢC 15 PHÚT
             timerInterval = setInterval(() => {
-                let elapsed = Math.floor((Date.now() - startTime) / 1000);
-                timeDisplay.innerText = `Thời gian: ${elapsed}s`;
+                timeLeft--;
+                let minutes = Math.floor(timeLeft / 60);
+                let seconds = timeLeft % 60;
+                timeDisplay.innerText = `Thời gian: ${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+
+                if (timeLeft <= 60) {
+                    timeDisplay.classList.add('timer-warning'); // Cảnh báo nhấp nháy đỏ
+                }
+
+                if (timeLeft <= 0) {
+                    clearInterval(timerInterval);
+                    showGameModal("HẾT GIỜ", "Đã hết 15 phút! Hệ thống tự động khóa và nộp bài hiện tại.", function() {
+                        finishGame(true);
+                    });
+                }
             }, 1000);
         }
 
@@ -359,7 +364,6 @@
             document.getElementById('btnSubmitAnswer').disabled = true;
             let userAnswer = playerAnswerInput.value.trim();
             
-            // Sử dụng Base64 để so sánh đáp án
             let hashedUserAnswer = btoa(userAnswer);
 
             if (hashedUserAnswer === stations[currentStationIndex].answerHash) {
@@ -382,53 +386,50 @@
                 if (currentStationIndex < stations.length) { 
                     loadStation(); 
                 } else { 
-                    finishGame(); 
+                    finishGame(false); 
                 }
             }, 1200);
         }
 
-        // ==========================================
-        // FIREBASE: GỬI ĐIỂM VÀ LẮNG NGHE BẢNG XẾP HẠNG
-        // ==========================================
-        function finishGame() {
+        function finishGame(isTimeout = false) {
             clearInterval(timerInterval);
-            let totalTimeSeconds = Math.floor((Date.now() - startTime) / 1000);
+            let timeUsed = 900 - timeLeft; // Tính điểm dựa trên 900 giây
             
             sfxWin.currentTime = 0; 
             sfxWin.play();
 
             showScreen(screenLeaderboard);
-            finalResult.innerText = `Hoàn thành! Đạt ${score} điểm với tổng thời lượng ${totalTimeSeconds} giây.`;
+            
+            if (isTimeout) {
+                finalResult.innerText = `Hết thời gian! Đạt ${score} điểm.`;
+            } else {
+                finalResult.innerText = `Hoàn thành! Đạt ${score} điểm với tổng thời lượng ${timeUsed} giây.`;
+            }
 
-            // Ghi dữ liệu trực tiếp lên Firebase
             leaderboardRef.push({
                 name: currentPlayer,
                 score: score,
-                time: totalTimeSeconds,
+                time: timeUsed,
                 timestamp: firebase.database.ServerValue.TIMESTAMP
             });
         }
 
-        // Xem bảng xếp hạng không cần chơi
         document.getElementById('btnViewLeaderboard').addEventListener('click', () => {
             showScreen(screenLeaderboard);
             finalResult.innerText = ""; 
         });
 
-        // LẮNG NGHE DỮ LIỆU REAL-TIME (Tự động cập nhật khi có người gửi điểm)
         leaderboardRef.on('value', (snapshot) => {
             let data = [];
             snapshot.forEach((childSnapshot) => {
                 data.push(childSnapshot.val());
             });
 
-            // Thuật toán Xếp hạng: Điểm cao lên trên, Thời gian ít lên trên
             data.sort((a, b) => {
                 if (b.score !== a.score) return b.score - a.score;
                 return a.time - b.time;
             });
 
-            // Chỉ hiển thị Top 10
             let top10 = data.slice(0, 10);
             renderLeaderboard(top10);
         });
